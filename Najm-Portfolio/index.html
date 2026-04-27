@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Najm | VFX & Motion Design</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    
+    <style>
+        ::-webkit-scrollbar { display: none; }
+        html { scrollbar-width: none; -ms-overflow-style: none; }
+
+        body { 
+            background-color: #0A0A0A; 
+            color: #E5E7EB; 
+            overflow-x: hidden; 
+        }
+
+        .gsap-transform {
+            transition: border-color 0.3s ease, background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+            will-change: transform;
+            display: inline-block; 
+        }
+
+        :root { --rgb-split: 0; }
+        .rgb-glitch {
+            text-shadow: calc(var(--rgb-split) * 1px) 0 0 rgba(255, 0, 0, 0.8), 
+                         calc(var(--rgb-split) * -1px) 0 0 rgba(0, 255, 255, 0.8);
+            transition: text-shadow 0.1s ease-out;
+        }
+
+        .noise-overlay {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; 
+            z-index: 9996; opacity: 0.03; 
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        }
+
+        #saber-trail {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            pointer-events: none; z-index: 9995; mix-blend-mode: screen;
+        }
+
+        #splash-screen {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background-color: #0A0A0A; z-index: 999999;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+        }
+        
+        #render-bar-container {
+            width: 300px; height: 8px; background-color: #222; border-radius: 4px; overflow: hidden; margin-top: 15px;
+        }
+        
+        #render-bar { 
+            width: 0%; height: 100%; background-color: #2dd4bf; box-shadow: 0 0 15px #2dd4bf; 
+        }
+
+        #domain-layer {
+            position: fixed; top: 50%; left: 50%;
+            width: 150vmax; height: 150vmax;
+            background-color: #050505;
+            border: 8px solid #3b82f6; box-shadow: inset 0 0 100px #3b82f6;
+            border-radius: 50%; z-index: 99999; pointer-events: none;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .horizontal-container { 
+            display: flex; width: 500vw; height: 100vh; will-change: transform; position: relative; z-index: 10; 
+        }
+        
+        .horizontal-section { 
+            width: 100vw; height: 100vh; display: flex; align-items: center; justify-content: center; flex-shrink: 0; padding: 0 5vw; 
+        }
+
+        @keyframes float {
+            0% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -50px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+            100% { transform: translate(0, 0) scale(1); }
+        }
+        
+        .animate-float-slow { animation: float 15s ease-in-out infinite; }
+        .animate-float-fast { animation: float 10s ease-in-out infinite alternate; }
+
+        /* --- Glass Text Effect --- */
+        .glass-text-shared {
+            color: rgba(255, 255, 255, 0.05);
+            -webkit-backdrop-filter: blur(12px) saturate(150%);
+            backdrop-filter: blur(12px) saturate(150%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            font-weight: 900;
+            transition: all 0.5s ease;
+        }
+
+        .glass-stroke-teal { -webkit-text-stroke: 1.5px rgba(45, 212, 191, 0.6); text-shadow: 0 0 20px rgba(45, 212, 191, 0.3); }
+        .glass-stroke-blue { -webkit-text-stroke: 1.5px rgba(59, 130, 246, 0.6); text-shadow: 0 0 20px rgba(59, 130, 246, 0.3); }
+        .glass-stroke-purple { -webkit-text-stroke: 1.5px rgba(168, 85, 247, 0.6); text-shadow: 0 0 20px rgba(168, 85, 247, 0.3); }
+        .glass-stroke-red { -webkit-text-stroke: 1.5px rgba(239, 68, 68, 0.6); text-shadow: 0 0 20px rgba(239, 68, 68, 0.3); }
+
+        .domain-glitch-btn {
+            position: relative; background: rgba(59, 130, 246, 0.1); border: 2px solid #3b82f6;
+            box-shadow: 0 0 20px rgba(59, 130, 246, 0.4), inset 0 0 10px rgba(59, 130, 246, 0.2);
+            animation: breatheGlow 3s infinite ease-in-out;
+        }
+        
+        .domain-glitch-btn::before {
+            content: ''; position: absolute; top: -5px; left: -5px; right: -5px; bottom: -5px;
+            border: 1px solid rgba(45, 212, 191, 0.3); border-radius: 50px;
+            animation: noiseLine 2s infinite linear; pointer-events: none;
+        }
+        
+        @keyframes breatheGlow { 0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.4); } 50% { box-shadow: 0 0 40px rgba(45, 212, 191, 0.6); } }
+        @keyframes noiseLine { 0% { clip-path: inset(80% 0 0 0); } 50% { clip-path: inset(10% 0 70% 0); } 100% { clip-path: inset(40% 0 10% 0); } }
+    </style>
+</head>
+<body class="antialiased selection:bg-teal-600 selection:text-white relative opacity-0" id="main-body">
+
+    <canvas id="saber-trail"></canvas>
+
+    <div id="splash-screen">
+        <div class="text-center">
+            <h4 class="text-xl font-bold text-white tracking-widest uppercase">Rendering Comp...</h4>
+            <div id="render-bar-container"><div id="render-bar"></div></div>
+            <p class="mt-2 text-sm text-gray-500"><span id="render-percent">0</span>% Complete</p>
+        </div>
+    </div>
+
+    <div id="domain-layer"></div>
+    <div class="noise-overlay"></div>
+
+    <div class="fixed right-4 top-0 h-full w-10 pointer-events-none z-[9999] flex flex-col items-center py-8">
+        <div class="relative w-[3px] flex-grow bg-white/10 rounded-full overflow-hidden">
+            <div id="scroll-liquid" class="absolute top-0 left-0 w-full h-0 bg-gradient-to-b from-teal-400 to-blue-500 shadow-[0_0_15px_#2dd4bf]"></div>
+        </div>
+        <div class="relative mt-[-2px] w-6 h-8 border-2 border-t-0 border-white/20 rounded-b-md overflow-hidden bg-white/5 backdrop-blur-md">
+            <div id="cup-liquid" class="absolute bottom-0 left-0 w-full h-0 bg-gradient-to-t from-blue-500 to-teal-400 shadow-[0_0_15px_#3b82f6]"></div>
+        </div>
+    </div>
+
+    <nav class="bounce-element relative z-20 p-8 flex justify-between items-center">
+        <h1 class="text-3xl font-black tracking-tighter text-white rgb-glitch">NAJM.</h1>
+        <a href="#contact" class="magnetic-btn gsap-transform text-lg font-bold border-b-2 border-transparent hover:border-white">Let's Talk</a>
+    </nav>
+
+    <section class="relative h-[100vh] flex flex-col justify-center px-8 md:px-20 overflow-hidden">
+        <div class="glow-orb absolute top-[-10%] right-[10%] w-96 h-96 bg-violet-600 rounded-full filter blur-[120px] opacity-30 animate-float-slow"></div>
+        <div class="glow-orb absolute bottom-[10%] left-[5%] w-96 h-96 bg-blue-600 rounded-full filter blur-[120px] opacity-20 animate-float-fast"></div>
+
+        <div class="relative z-10">
+            <h2 class="bounce-element text-6xl md:text-8xl font-black uppercase leading-none tracking-tighter text-white rgb-glitch">
+                <div class="scramble-text inline-block" data-text="CRAFTING">CRAFTING</div> <br> 
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-500 scramble-text inline-block" data-text="VISUAL">VISUAL</span> 
+                <div class="scramble-text inline-block" data-text="REALITY.">REALITY.</div>
+            </h2>
+            <p class="bounce-element mt-6 text-xl max-w-lg text-gray-400 font-medium scramble-text" data-text="VFX Artist & Motion Designer. Transforming raw footage into high-end visual experiences.">
+                VFX Artist & Motion Designer. Transforming raw footage into high-end visual experiences.
+            </p>
+        </div>
+    </section>
+
+    <div id="horizontal-wrapper" class="relative overflow-hidden bg-[#050505]">
+        <div class="absolute inset-0 z-0 pointer-events-none">
+            <div class="absolute top-1/4 left-1/4 w-[40vw] h-[40vw] bg-teal-600/10 rounded-full mix-blend-screen filter blur-[120px] animate-float-slow"></div>
+            <div class="absolute bottom-1/4 right-1/4 w-[35vw] h-[35vw] bg-purple-600/10 rounded-full mix-blend-screen filter blur-[120px] animate-float-fast"></div>
+        </div>
+
+        <div class="horizontal-container">
+            <section class="horizontal-section">
+                <div class="text-center relative z-10">
+                    <h3 class="text-6xl md:text-9xl font-black text-white/10 uppercase tracking-tighter rgb-glitch scramble-text" data-text="SELECTED WORKS">SELECTED WORKS</h3>
+                    <p class="text-teal-400 font-bold tracking-[0.5em] mt-4">SCROLL TO EXPLORE</p>
+                </div>
+            </section>
+            
+            <section class="horizontal-section">
+                <div class="w-full max-w-sm md:max-w-md">
+                    <div class="video-card tilt-card gsap-transform group relative w-full aspect-[9/16] rounded-[2.5rem] bg-white/5 border border-white/10 hover:border-teal-500/50 shadow-[0_0_40px_rgba(45,212,191,0.1)] cursor-pointer" style="transform-style: preserve-3d;">
+                        <div class="absolute inset-0 rounded-[2.5rem] overflow-hidden z-0">
+                            <video loop muted playsinline preload="auto" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-700">
+                                <source src="video1.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" style="transform: translateZ(60px);">
+                            <h4 class="text-5xl md:text-6xl text-center glass-text-shared glass-stroke-teal uppercase tracking-tighter px-4 transition-transform duration-500 group-hover:scale-110">VFX Showcase</h4>
+                        </div>
+                        <div class="play-icon absolute bottom-8 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-full text-white group-hover:opacity-0 transition-opacity">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="horizontal-section">
+                <div class="w-full max-w-5xl">
+                    <div class="video-card tilt-card gsap-transform group relative w-full aspect-video rounded-[2rem] bg-white/5 border border-white/10 hover:border-blue-500/50 shadow-[0_0_40px_rgba(59,130,246,0.1)] cursor-pointer" style="transform-style: preserve-3d;">
+                        <div class="absolute inset-0 rounded-[2rem] overflow-hidden z-0">
+                            <video loop muted playsinline preload="auto" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-700">
+                                <source src="video2.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" style="transform: translateZ(80px);">
+                            <h4 class="text-6xl md:text-8xl text-center glass-text-shared glass-stroke-blue uppercase tracking-tighter transition-transform duration-500 group-hover:scale-110">Anime Edits</h4>
+                        </div>
+                        <div class="play-icon absolute bottom-8 right-8 bg-white/10 backdrop-blur-md border border-white/20 p-5 rounded-full text-white group-hover:opacity-0 transition-opacity">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="horizontal-section">
+                <div class="w-full max-w-5xl">
+                    <div class="video-card tilt-card gsap-transform group relative w-full aspect-video rounded-[2rem] bg-white/5 border border-white/10 hover:border-purple-500/50 shadow-[0_0_40px_rgba(168,85,247,0.1)] cursor-pointer" style="transform-style: preserve-3d;">
+                        <div class="absolute inset-0 rounded-[2rem] overflow-hidden z-0">
+                            <video loop muted playsinline preload="auto" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-700">
+                                <source src="video3.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" style="transform: translateZ(80px);">
+                            <h4 class="text-6xl md:text-8xl text-center glass-text-shared glass-stroke-purple uppercase tracking-tighter transition-transform duration-500 group-hover:scale-110">Motion Design</h4>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="horizontal-section">
+                <div class="w-full max-w-5xl">
+                    <div class="video-card tilt-card gsap-transform group relative w-full aspect-video rounded-[2rem] bg-white/5 border border-white/10 hover:border-red-500/50 shadow-[0_0_40px_rgba(239,68,68,0.1)] cursor-pointer" style="transform-style: preserve-3d;">
+                        <div class="absolute inset-0 rounded-[2rem] overflow-hidden z-0">
+                            <video loop muted playsinline preload="auto" class="w-full h-full object-cover opacity-60 group-hover:opacity-100 transition-opacity duration-700">
+                                <source src="video4.mp4" type="video/mp4">
+                            </video>
+                        </div>
+                        <div class="absolute inset-0 flex items-center justify-center z-20 pointer-events-none" style="transform: translateZ(80px);">
+                            <h4 class="text-6xl md:text-8xl text-center glass-text-shared glass-stroke-red uppercase tracking-tighter transition-transform duration-500 group-hover:scale-110">Compositing</h4>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </div>
+
+    <section id="arsenal" class="relative px-8 md:px-20 py-32 bg-[#0A0A0A] overflow-hidden flex flex-col justify-center">
+        <div class="glow-orb absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-violet-900/10 rounded-full filter blur-[150px] pointer-events-none"></div>
+        <h3 class="bounce-element text-4xl font-bold mb-12 text-white rgb-glitch scramble-text" data-text="The Arsenal">The Arsenal</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8 z-10">
+            <div class="bounce-element p-10 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] text-center">
+                <h4 class="text-teal-400 font-bold mb-4 uppercase tracking-widest text-sm">Software</h4>
+                <ul class="text-2xl text-gray-200"><li>After Effects</li><li>Premiere</li></ul>
+            </div>
+            <div class="bounce-element p-10 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] text-center">
+                <h4 class="text-teal-400 font-bold mb-4 uppercase tracking-widest text-sm">Plugins</h4>
+                <ul class="text-2xl text-gray-200"><li>Sapphire</li><li>Trapcode</li></ul>
+            </div>
+            <div class="bounce-element p-10 bg-white/5 backdrop-blur-3xl border border-white/10 rounded-[2rem] text-center">
+                <h4 class="text-teal-400 font-bold mb-4 uppercase tracking-widest text-sm">Focus</h4>
+                <ul class="text-2xl text-gray-200"><li>Compositing</li><li>Motion</li></ul>
+            </div>
+        </div>
+    </section>
+
+    <section id="contact" class="relative px-8 md:px-20 py-32 flex flex-col items-center justify-center text-center min-h-screen overflow-hidden">
+        <div class="glow-orb absolute bottom-0 left-[20%] w-[500px] h-[300px] bg-blue-600/10 rounded-full filter blur-[120px] pointer-events-none"></div>
+        <h2 class="bounce-element text-5xl md:text-8xl font-black uppercase tracking-tighter mb-12 text-white rgb-glitch scramble-text" data-text="Let's Create Something Epic.">Let's Create <br> Something Epic.</h2>
+        
+        <div class="bounce-element grid grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-4xl mb-20">
+            <a href="https://linkedin.com/in/arbkan96" target="_blank" class="magnetic-btn gsap-transform p-6 bg-white/5 border border-white/10 rounded-3xl hover:border-blue-500 hover:bg-blue-500/10 transition-all group">
+                <p class="text-blue-400 font-bold uppercase tracking-widest text-xs mb-2">Network</p>
+                <span class="text-xl font-black text-white group-hover:text-blue-400">LinkedIn</span>
+            </a>
+            <a href="https://instagram.com/arbkan_" target="_blank" class="magnetic-btn gsap-transform p-6 bg-white/5 border border-white/10 rounded-3xl hover:border-pink-500 hover:bg-pink-500/10 transition-all group">
+                <p class="text-pink-400 font-bold uppercase tracking-widest text-xs mb-2">Visuals</p>
+                <span class="text-xl font-black text-white group-hover:text-pink-400">Instagram</span>
+            </a>
+            <a href="https://wa.me/963982253358" target="_blank" class="magnetic-btn gsap-transform p-6 bg-white/5 border border-white/10 rounded-3xl hover:border-green-500 hover:bg-green-500/10 transition-all group">
+                <p class="text-green-400 font-bold uppercase tracking-widest text-xs mb-2">Direct</p>
+                <span class="text-xl font-black text-white group-hover:text-green-400">WhatsApp</span>
+            </a>
+            <a href="https://mail.google.com/mail/?view=cm&fs=1&to=morestaon@gmail.com" target="_blank" class="magnetic-btn gsap-transform p-6 bg-white/5 border border-white/10 rounded-3xl hover:border-teal-400 hover:bg-teal-400/10 transition-all group">
+    <p class="text-teal-400 font-bold uppercase tracking-widest text-xs mb-2">Inquiry</p>
+    <span class="text-xl font-black text-white group-hover:text-teal-400">Email</span>
+</a>
+        </div>
+
+        <a href="#" onclick="triggerDomainExpansion('cv.html'); return false;" class="magnetic-btn gsap-transform domain-glitch-btn inline-flex items-center gap-2 px-12 py-5 text-blue-400 font-black rounded-full text-xl uppercase tracking-tighter">
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-6 h-6">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18c-2.305 0-4.408.867-6 2.292m0-14.25v14.25" />
+            </svg>
+            Expand Domain [View Full CV]
+        </a>
+    </section>
+
+    <script>
+        gsap.registerPlugin(ScrollTrigger);
+
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playBassDrop() { 
+            if(audioCtx.state === 'suspended') audioCtx.resume(); 
+            const osc = audioCtx.createOscillator(); 
+            const gainNode = audioCtx.createGain(); 
+            osc.type = 'sawtooth'; 
+            osc.frequency.setValueAtTime(150, audioCtx.currentTime); 
+            osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 1.5); 
+            gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime); 
+            gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5); 
+            osc.connect(gainNode); 
+            gainNode.connect(audioCtx.destination); 
+            osc.start(); 
+            osc.stop(audioCtx.currentTime + 1.5); 
+        }
+
+        function scrambleText(element) { 
+            const original = element.getAttribute('data-text'); 
+            if(!original) return; 
+            const chars = '!<>-_\\/[]{}—=+*^?#________'; 
+            let iteration = 0; 
+            const interval = setInterval(() => { 
+                element.innerText = original.split('').map((char, index) => { 
+                    if(index < iteration) return original[index]; 
+                    return chars[Math.floor(Math.random() * chars.length)]; 
+                }).join(''); 
+                if(iteration >= original.length) clearInterval(interval); 
+                iteration += 1.5; 
+            }, 25); 
+        }
+
+        let lastScrollY = window.scrollY;
+        window.addEventListener('scroll', () => {
+            const currentScrollY = window.scrollY;
+            const scrollVelocity = Math.abs(currentScrollY - lastScrollY);
+            const splitAmount = Math.min(scrollVelocity * 0.1, 10); 
+            document.documentElement.style.setProperty('--rgb-split', splitAmount);
+            lastScrollY = currentScrollY;
+            clearTimeout(window.scrollTimeout);
+            window.scrollTimeout = setTimeout(() => { document.documentElement.style.setProperty('--rgb-split', 0); }, 100);
+        });
+
+        const canvas = document.getElementById('saber-trail');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+        
+        function resizeCanvas() { 
+            canvas.width = window.innerWidth; 
+            canvas.height = window.innerHeight; 
+        }
+        
+        window.addEventListener('resize', resizeCanvas); 
+        resizeCanvas();
+        
+        window.addEventListener('mousemove', (e) => { 
+            for(let i=0; i<3; i++) { 
+                particles.push({ 
+                    x: e.clientX, 
+                    y: e.clientY, 
+                    vx: (Math.random() - 0.5) * 2, 
+                    vy: (Math.random() - 0.5) * 2, 
+                    life: 1, 
+                    size: Math.random() * 4 + 2 
+                }); 
+            } 
+        });
+
+        function animateParticles() { 
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            for(let i = 0; i < particles.length; i++) { 
+                let p = particles[i]; 
+                p.x += p.vx; 
+                p.y += p.vy; 
+                p.life -= 0.03; 
+                if(p.life <= 0) { 
+                    particles.splice(i, 1); 
+                    i--; 
+                    continue; 
+                } 
+                ctx.beginPath(); 
+                ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2); 
+                ctx.fillStyle = `rgba(45, 212, 191, ${p.life})`; 
+                ctx.shadowBlur = 15; 
+                ctx.shadowColor = '#3b82f6'; 
+                ctx.fill(); 
+            } 
+            requestAnimationFrame(animateParticles); 
+        }
+        animateParticles();
+
+        document.body.classList.remove('opacity-0');
+        window.addEventListener('load', () => {
+            const hasRendered = sessionStorage.getItem('najmRenderDone');
+            const splashScreen = document.getElementById('splash-screen');
+            const renderBar = document.getElementById('render-bar');
+            
+            if (!hasRendered) {
+                gsap.to(renderBar, { 
+                    width: '100%', 
+                    duration: 1.5, 
+                    ease: "power2.inOut", 
+                    onUpdate: function() { 
+                        document.getElementById('render-percent').innerText = Math.round(this.progress() * 100); 
+                    }, 
+                    onComplete: () => { 
+                        sessionStorage.setItem('najmRenderDone', 'true'); 
+                        gsap.to(splashScreen, { 
+                            opacity: 0, 
+                            duration: 0.3, 
+                            onComplete: () => { 
+                                splashScreen.style.display = 'none'; 
+                                startEntranceAnimation(); 
+                            }
+                        }); 
+                    }
+                });
+            } else { 
+                splashScreen.style.display = 'none'; 
+                startEntranceAnimation(); 
+            }
+        });
+
+        function startEntranceAnimation() {
+            gsap.to("#domain-layer", { scale: 0, duration: 1.2, ease: "power3.inOut" });
+            gsap.from(".bounce-element", { 
+                y: 100, 
+                opacity: 0, 
+                duration: 1.2, 
+                stagger: 0.1, 
+                ease: "power4.out", 
+                onStart: () => { document.querySelectorAll('.scramble-text').forEach(el => scrambleText(el)); } 
+            });
+            initHorizontalScroll();
+            initVideoControllers();
+        }
+
+        function initHorizontalScroll() {
+            let sections = gsap.utils.toArray(".horizontal-section");
+            gsap.to(sections, { 
+                xPercent: -100 * (sections.length - 1), 
+                ease: "none", 
+                scrollTrigger: { 
+                    trigger: "#horizontal-wrapper", 
+                    pin: true, 
+                    scrub: 1, 
+                    snap: 1 / (sections.length - 1), 
+                    start: "top top", 
+                    end: () => "+=" + document.querySelector(".horizontal-container").offsetWidth 
+                } 
+            });
+        }
+
+        function initVideoControllers() {
+            const videoCards = document.querySelectorAll('.video-card');
+            let currentlyPlaying = null;
+            
+            videoCards.forEach(card => {
+                const video = card.querySelector('video');
+                const playIcon = card.querySelector('.play-icon');
+                
+                card.addEventListener('mouseenter', () => { 
+                    if (window.matchMedia("(pointer: fine)").matches) { 
+                        if (currentlyPlaying && currentlyPlaying !== video) {
+                            currentlyPlaying.pause();
+                        }
+                        video.play(); 
+                        currentlyPlaying = video; 
+                        if(playIcon) playIcon.style.opacity = '0'; 
+                    } 
+                });
+                
+                card.addEventListener('mouseleave', () => { 
+                    if (window.matchMedia("(pointer: fine)").matches) { 
+                        video.pause(); 
+                        if(playIcon) playIcon.style.opacity = '1'; 
+                    } 
+                });
+                
+                card.addEventListener('click', () => { 
+                    if (video.paused) { 
+                        if (currentlyPlaying && currentlyPlaying !== video) {
+                            currentlyPlaying.pause();
+                            const oldIcon = currentlyPlaying.closest('.video-card').querySelector('.play-icon');
+                            if(oldIcon) oldIcon.style.opacity = '1';
+                        }
+                        video.play(); 
+                        currentlyPlaying = video; 
+                        if(playIcon) playIcon.style.opacity = '0'; 
+                    } else { 
+                        video.pause(); 
+                        currentlyPlaying = null; 
+                        if(playIcon) playIcon.style.opacity = '1'; 
+                    } 
+                });
+            });
+        }
+
+        function triggerDomainExpansion(url) { 
+            playBassDrop(); 
+            gsap.to("#domain-layer", { 
+                scale: 1, 
+                duration: 1, 
+                ease: "power3.inOut", 
+                onStart: () => { document.body.style.overflow = 'hidden'; }, 
+                onComplete: () => { window.location.href = url; } 
+            }); 
+        }
+
+        document.querySelectorAll('.magnetic-btn').forEach(btn => {
+            btn.addEventListener('mousemove', (e) => { 
+                const rect = btn.getBoundingClientRect(); 
+                const x = (e.clientX - rect.left - rect.width / 2) * 0.15; 
+                const y = (e.clientY - rect.top - rect.height / 2) * 0.15; 
+                gsap.to(btn, { x: x, y: y, scale: 1.02, duration: 0.4 }); 
+            });
+            btn.addEventListener('mouseleave', () => { 
+                gsap.to(btn, { x: 0, y: 0, scale: 1, duration: 0.7, ease: "elastic.out(1, 0.4)" }); 
+            });
+        });
+
+        document.querySelectorAll('.tilt-card').forEach((card, i) => {
+            card.addEventListener('mousemove', (e) => { 
+                const rect = card.getBoundingClientRect(); 
+                const rx = ((e.clientY - rect.top) - rect.height / 2) / (rect.height / 2) * -10; 
+                const ry = ((e.clientX - rect.left) - rect.width / 2) / (rect.width / 2) * 10; 
+                gsap.to(card, { rotateX: rx, rotateY: ry, scale: 1.02, duration: 0.4 }); 
+            });
+            card.addEventListener('mouseleave', () => { 
+                gsap.to(card, { rotateX: 0, rotateY: 0, scale: 1, duration: 0.6 }); 
+            });
+        });
+
+        const scrollLiquid = document.getElementById('scroll-liquid');
+        const cupLiquid = document.getElementById('cup-liquid');
+        window.addEventListener('scroll', () => {
+            const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+            gsap.to([scrollLiquid, cupLiquid], { height: `${scrollPercent * 100}%`, duration: 0.1, ease: "none" });
+        });
+    </script>
+</body>
+</html>
